@@ -256,6 +256,9 @@ TEXT_EXTENSIONS = {
 DOCUMENT_EXTENSIONS = {".pdf"}
 
 MULTI_ROWS_EXTENSIONS = {".parquet", ".csv", ".json", ".jsonl", ".arrow"}
+
+HTML_REPORT_EXTENSIONS = {".html"}
+
 ALL_EXTENSIONS = (
     IMAGE_EXTENSIONS
     | AUDIO_EXTENSIONS
@@ -266,6 +269,7 @@ ALL_EXTENSIONS = (
     | _3D_EXTENSIONS
     | TEXT_EXTENSIONS
     | MULTI_ROWS_EXTENSIONS
+    | HTML_REPORT_EXTENSIONS
 )
 
 
@@ -299,12 +303,10 @@ def detect_modalities_from_filetypes(dataset: str) -> set[DatasetModality]:
         has_multi_rows_files = any(
             filetype["count"] for filetype in content["filetypes"] if filetype["extension"] in MULTI_ROWS_EXTENSIONS
         )
-        min_count = round(0.1 * total_count)  # ignore files that are <10% of the data files to avoid false positives
-        min_count_for_image = (
-            10 if has_multi_rows_files else 1
-        )  # images are often used as figures in README, so we also add this threshold
+        min_count = round(0.1 * total_count)
+        min_count_for_image = 10 if has_multi_rows_files else 1
+
         for filetype in content["filetypes"]:
-            # we condition by a number of files (filetype["count"] > threshold) to avoid false positives
             if filetype["count"] < min_count:
                 continue
             elif filetype["extension"] in IMAGE_EXTENSIONS and filetype["count"] < min_count_for_image:
@@ -323,10 +325,17 @@ def detect_modalities_from_filetypes(dataset: str) -> set[DatasetModality]:
                 modalities.add("text")
             elif filetype["extension"] in DOCUMENT_EXTENSIONS:
                 modalities.add("document")
+
+        # ✅ New logic to detect HTML report modality
+        for filetype in content["filetypes"]:
+            if filetype["extension"] in HTML_REPORT_EXTENSIONS and filetype["count"] >= 1:
+                modalities.add("html")
+
     except Exception as e:
         raise PreviousStepFormatError("Previous step did not return the expected content.", e) from e
 
     return modalities
+
 
 
 def compute_modalities_response(dataset: str) -> DatasetModalitiesResponse:
